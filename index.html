@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SPX Signals</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F5F6F8; --card:#FFFFFF; --ink:#1A1F26; --muted:#6B7480; --rule:#E4E7EB;
+  --up:#16794C; --down:#C2392F; --hot:#C2392F; --warm:#B7791F;
+  --hot-bg:#FCEDEB; --warm-bg:#FBF3E4; --idle-bg:#F0F2F4;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "IBM Plex Sans",system-ui,sans-serif}
+main{max-width:1120px;margin:0 auto;padding:32px 16px 56px}
+.num{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums}
+.up{color:var(--up)} .down{color:var(--down)}
+
+header{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap}
+.spx-label{font-size:13px;color:var(--muted);font-weight:500}
+.spx{font:600 40px/1.1 "IBM Plex Sans",sans-serif;letter-spacing:-.01em}
+.spx-chg{font-size:16px;margin-left:8px}
+.status{font-size:13px;color:var(--muted);text-align:right}
+.status .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--muted);margin-right:6px;vertical-align:1px}
+.status .dot.live{background:var(--up)}
+
+.chips{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:20px}
+.chip{background:var(--card);border:1px solid var(--rule);border-radius:10px;padding:12px 14px}
+.chip .k{font-size:12px;color:var(--muted)}
+.chip .v{font-size:20px;font-weight:500}
+
+h2{font-size:14px;font-weight:600;color:var(--muted);margin:32px 0 10px;text-transform:uppercase;letter-spacing:.06em}
+.list{background:var(--card);border:1px solid var(--rule);border-radius:12px;overflow:hidden}
+.row{border-top:1px solid var(--rule)}
+.row:first-child{border-top:0}
+.cols{display:grid;grid-template-columns:28px minmax(200px,1fr) 84px 56px repeat(6,66px);align-items:center;gap:10px}
+.cols > .c,.stats > .c{text-align:right}
+.stats{display:contents}
+.thead{padding:10px 16px;font-size:11.5px;color:var(--muted);border-bottom:1px solid var(--rule);background:#FAFBFC}
+.thead .grp{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em}
+.rank{font:500 13px "IBM Plex Mono",monospace;color:var(--muted)}
+.c{font:500 14px "IBM Plex Mono",monospace}
+.c.score{color:var(--muted)}
+.row > button{all:unset;box-sizing:border-box;width:100%;padding:14px 16px;cursor:pointer}
+.row > button.cols{display:grid;grid-template-columns:28px minmax(200px,1fr) 84px 56px repeat(6,66px);align-items:center;gap:10px}
+.row > button:hover{background:#FAFBFC}
+.row > button:focus-visible{outline:2px solid var(--ink);outline-offset:-2px}
+.name{font-weight:500}
+.now{font-size:13px;color:var(--muted)}
+.pill{font-size:12px;font-weight:600;padding:3px 10px;border-radius:99px;white-space:nowrap}
+.pill.triggered{background:var(--hot-bg);color:var(--hot)}
+.pill.armed{background:var(--warm-bg);color:var(--warm)}
+.pill.watching{background:var(--idle-bg);color:var(--muted)}
+.detail{display:none;padding:2px 16px 18px 54px;font-size:13.5px;color:var(--muted)}
+.row.open .detail{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+.row.open > button{background:#FAFBFC}
+.desc p{margin:0 0 8px;max-width:60ch}
+.desc .rule{font-size:12.5px}
+.vals{border:1px solid var(--rule);border-radius:8px;overflow:hidden;align-self:start}
+.vals div{display:flex;justify-content:space-between;gap:12px;padding:8px 12px;border-top:1px solid var(--rule)}
+.vals div:first-child{border-top:0}
+.vals span{font-size:12px;text-transform:uppercase;letter-spacing:.05em}
+.vals b{font:500 14px "IBM Plex Mono",monospace;color:var(--ink)}
+.vals b.up{color:var(--up)} .vals b.down{color:var(--down)} .vals b.warn{color:var(--warm)}
+
+.alerts{background:var(--card);border:1px solid var(--rule);border-radius:12px;padding:4px 16px}
+.alert{display:grid;grid-template-columns:120px 1fr;gap:12px;padding:10px 0;border-top:1px solid var(--rule);font-size:14px}
+.alert:first-child{border-top:0}
+.alert time{color:var(--muted);font-size:13px}
+.empty{color:var(--muted);padding:12px 0;font-size:14px}
+
+@media (max-width:900px){
+  .thead{display:none}
+  .row > button.cols{grid-template-columns:22px 1fr auto;row-gap:8px}
+  .row .cols .c{text-align:left;font-size:13px}
+  .row .cols .stats{grid-column:2/-1;display:grid;grid-template-columns:repeat(3,1fr);gap:6px 10px}
+  .row .cols .score{grid-column:2/-1;display:flex;gap:6px;align-items:baseline}
+  .row .cols .score::before{display:inline}
+  .c[data-l]::before{content:attr(data-l);display:block;font:11px "IBM Plex Sans",sans-serif;color:var(--muted)}
+  .row.open .detail{grid-template-columns:1fr;padding-left:16px;gap:12px}
+}
+@media (max-width:600px){
+  .alert{grid-template-columns:1fr;gap:2px}
+  .spx{font-size:32px}
+}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <div class="spx-label">S&amp;P 500</div>
+      <div><span class="spx num" id="spx">–</span><span class="spx-chg num" id="spxChg"></span></div>
+    </div>
+    <div class="status"><span class="dot" id="dot"></span><span id="conn">Connecting…</span><br><span id="market"></span></div>
+  </header>
+
+  <div class="chips">
+    <div class="chip"><div class="k">VIX</div><div class="v num" id="vix">–</div></div>
+    <div class="chip"><div class="k">VIX ÷ VIX3M</div><div class="v num" id="ratio">–</div></div>
+    <div class="chip"><div class="k">SKEW</div><div class="v num" id="skew">–</div></div>
+  </div>
+
+  <h2>Signals</h2>
+  <div class="list" id="signals"></div>
+
+  <h2>Recent alerts</h2>
+  <div class="alerts" id="alerts"><div class="empty">No alerts yet.</div></div>
+</main>
+
+<script>
+const NAMES = {
+  vix_vix3m_backwardation: "VIX term structure",
+  skew_tail_risk_resolving: "SKEW falling from high",
+  bollinger_lower: "Below lower Bollinger band",
+  vix_fear_capitulation: "VIX drop after fear",
+  fib_retracement_bounce: "Fibonacci bounce",
+  skew_tail_risk_spike: "SKEW above 130",
+  macd_line_cross: "MACD crossover",
+  macd_histogram_pos: "MACD histogram turns up",
+  rsi_cross_40: "RSI back above 40",
+  obv_divergence: "OBV divergence",
+  price_cross_50ma: "Back above 50-day average",
+  inverse_etf_fear: "Inverse ETF fear",
+  vol_target_washout: "Vol-target fund washout",
+  breadth_washout: "Breadth wash-out",
+};
+const STATUS = {TRIGGERED:["triggered","Triggered"], ARMED:["armed","Armed"], WATCHING:["watching","Watching"]};
+const f = (n,d=2) => n==null ? "–" : Number(n).toFixed(d);
+const sg = (n,d=2) => n==null ? "–" : (n>=0?"+":"") + Number(n).toFixed(d);
+
+// one short line describing where each signal stands now
+function nowLine(k, v){
+  switch(k){
+    case "vix_vix3m_backwardation": return `Ratio ${f(v.ratio,2)} (fires when it falls back below 1.0)`;
+    case "skew_tail_risk_resolving": return `SKEW ${f(v.skew,1)}, ${sg(v.skew_chg_pct,1)}% today (needs −4%)`;
+    case "bollinger_lower": return `Close ${f(v.close,0)} vs band ${f(v.lower_band,0)} (${sg(v.dist_pct,1)}%)`;
+    case "vix_fear_capitulation": return `VIX ${f(v.vix,1)}, ${sg(v.vix_chg_pct,1)}% today (needs −5% from above 20)`;
+    case "fib_retracement_bounce": return `${f(v.nearest_dist_pct,1)}% from the ${v.nearest_fib} level`;
+    case "skew_tail_risk_spike": return `SKEW ${f(v.skew,1)}`;
+    case "macd_line_cross": return `MACD ${sg(v.gap,1)} vs signal line`;
+    case "macd_histogram_pos": return `Histogram ${sg(v.histogram,1)}, ${v.rising?"rising":"falling"}`;
+    case "rsi_cross_40": return `RSI ${f(v.rsi,1)}`;
+    case "obv_divergence": return `Price lower low: ${v.price_lower_low?"yes":"no"} · OBV higher low: ${v.obv_higher_low?"yes":"no"}`;
+    case "price_cross_50ma": return `${sg(v.gap_pct,1)}% vs 50-day average`;
+    case "inverse_etf_fear": return `5-day inverse share ${f(v.share_5d*100,1)}% (zone ≥40%${v.strong?", strong":""})`;
+    case "vol_target_washout": return `Exposure ${f(v.exposure,2)}×, z ${f(v.z,2)} (zone ≤ −1.0${v.strong?", strong":""})`;
+    case "breadth_washout": return `${f(v.pct*100,0)}% of stocks above 50-day (zone ≤30%${v.strong?", strong":""})`;
+    default: return "";
+  }
+}
+
+// live indicator readings for the dropdown: [label, value, colour]
+const yn = b => b==null ? "–" : (b ? "Yes ✓" : "No");
+const tone = (cond, good) => cond ? (good ? "up" : "down") : "";
+function valueRows(k, v){
+  switch(k){
+    case "vix_vix3m_backwardation": return [
+      ["VIX spot", f(v.vix)], ["VIX 3-month", f(v.vix3m)],
+      ["Ratio (→ <1.0)", f(v.ratio,4), v.ratio<1?"up":"down"],
+      ["VIX change", sg(v.vix_chg), v.vix_chg<=0?"up":"down"]];
+    case "skew_tail_risk_resolving": return [
+      ["SKEW today", f(v.skew)], ["SKEW prev", f(v.skew_prev)],
+      ["1d change", sg(v.skew_chg_pct)+"%", v.skew_chg_pct< -4?"up":v.skew_chg_pct>0?"down":""],
+      ["Prev > 130", yn(v.was_elevated), v.was_elevated?"warn":""]];
+    case "bollinger_lower": return [
+      ["SPX close", f(v.close)], ["Lower band", f(v.lower_band)], ["Middle band", f(v.middle_band)],
+      ["Distance", sg(v.dist_pct)+"%", v.dist_pct<=0.5?"warn":""],
+      ["%B", f(v.pct_b,3), v.pct_b<0.1?"down":v.pct_b<0.25?"warn":""]];
+    case "vix_fear_capitulation": return [
+      ["VIX now", f(v.vix)], ["VIX prev", f(v.vix_prev)],
+      ["1d change", sg(v.vix_chg_pct)+"%", v.vix_chg_pct< -5?"up":v.vix_chg_pct>0?"down":""],
+      ["Prev > 20", yn(v.above_20), v.above_20?"warn":""]];
+    case "fib_retracement_bounce": return [
+      ["SPX close", f(v.close)], ["38.2% level", f(v.fib_382)], ["50% level", f(v.fib_500)], ["61.8% level", f(v.fib_618)],
+      ["Nearest", `${v.nearest_fib} (${f(v.nearest_dist_pct)}% away)`, v.nearest_dist_pct<0.5?"warn":""]];
+    case "skew_tail_risk_spike": return [
+      ["SKEW today", f(v.skew)], ["SKEW prev", f(v.skew_prev)],
+      ["Distance from 130", sg(v.dist_pct)+"%", v.dist_pct>=0?"down":v.dist_pct>-2?"warn":""],
+      ["Above 130", yn(v.above_130), v.above_130?"down":""]];
+    case "macd_line_cross": return [
+      ["MACD", f(v.macd,3)], ["Signal line", f(v.signal_line,3)],
+      ["Histogram", sg(v.histogram,3), v.histogram>=0?"up":"down"], ["Gap", sg(v.gap,3), v.gap>=0?"up":""]];
+    case "macd_histogram_pos": return [
+      ["Histogram now", sg(v.histogram,3), v.histogram>=0?"up":"down"],
+      ["Histogram prev", sg(v.hist_prev,3), v.hist_prev>=0?"up":""],
+      ["Direction", v.rising?"↑ Rising":"↓ Falling", v.rising?"up":""]];
+    case "rsi_cross_40": return [
+      ["RSI(14) now", f(v.rsi), v.rsi>40?"up":v.rsi>36?"warn":""], ["RSI prev", f(v.rsi_prev)],
+      ["Direction", v.rising?"↑ Rising":"↓ Falling", v.rising?"up":""]];
+    case "obv_divergence": return [
+      ["SPX close", f(v.spx)], ["SPX 10d low", f(v.spx_10d_min)],
+      ["Price lower low", yn(v.price_lower_low), v.price_lower_low?"warn":""],
+      ["OBV higher low", yn(v.obv_higher_low), v.obv_higher_low?"up":""]];
+    case "price_cross_50ma": return [
+      ["SPX close", f(v.close)], ["50-day average", f(v.ma50)],
+      ["Gap", sg(v.gap_pct)+"%", v.gap_pct>0?"up":v.gap_pct>-0.5?"warn":""],
+      ["Above average", yn(v.above_ma), v.above_ma?"up":""]];
+    case "inverse_etf_fear": return [
+      ["5-day share (→ ≥40%)", f(v.share_5d*100,1)+"%", v.share_5d>=.4?"down":v.share_5d>=.35?"warn":""],
+      ["Strong zone (≥45%)", yn(v.strong), v.strong?"down":""],
+      ["5-day share prev", f(v.share_prev*100,1)+"%"],
+      ["Today's share", f(v.share_1d*100,1)+"%"],
+      ["Inverse $ today", "$"+f(v.inv_bn,1)+"bn"], ["Leveraged $ today", "$"+f(v.lev_bn,1)+"bn"]];
+    case "vol_target_washout": return [
+      ["Modeled exposure", f(v.exposure,2)+"×"], ["Exposure prev", f(v.exposure_prev,2)+"×"],
+      ["Z-score (→ ≤ −1.0)", f(v.z,2), v.z<=-1?"down":v.z<=-.5?"warn":""],
+      ["Z-score prev", f(v.z_prev,2)], ["Realised vol", f(v.realized_vol*100,1)+"%"],
+      ["Strong zone (≤ −2.0)", yn(v.strong), v.strong?"down":""]];
+    case "breadth_washout": return [
+      ["% above 50-day (→ ≤30%)", f(v.pct*100,1)+"%", v.pct<=.3?"down":v.pct<=.4?"warn":""],
+      ["Prev day", f(v.pct_prev*100,1)+"%"], ["10-day low", f(v.min_10d*100,1)+"%"],
+      ["Strong zone (≤20%)", yn(v.strong), v.strong?"down":""]];
+    default: return Object.entries(v).filter(([x])=>!["fired","armed"].includes(x)).map(([x,y])=>[x,String(y)]);
+  }
+}
+const pctTone = s => s==null ? "" : String(s).startsWith("-") ? "down" : "up";
+
+const open = new Set();
+function renderSignals(sigs){
+  const rows = Object.entries(sigs).sort((a,b)=> a[1].rank-b[1].rank);
+  $("signals").innerHTML = `<div class="thead cols">
+      <span>#</span><span>Indicator</span><span>Status</span><span class="c">Score</span>
+      <span class="c">Win 1d</span><span class="c">Win 5d</span><span class="c">Win 30d</span>
+      <span class="c">Avg 1d</span><span class="c">Avg 5d</span><span class="c">Avg 30d</span></div>` +
+  rows.map(([k,s])=>{
+    const [cls,label] = STATUS[s.status] || STATUS.WATCHING;
+    const v = s.values || {};
+    return `<div class="row${open.has(k)?" open":""}" data-k="${k}">
+      <button type="button" class="cols" aria-expanded="${open.has(k)}">
+        <span class="rank">${s.rank}</span>
+        <div><div class="name">${NAMES[k]||s.label}</div><div class="now">${nowLine(k, v)}</div></div>
+        <span><span class="pill ${cls}">${label}</span></span>
+        <span class="c score" data-l="Score">${s.cv_score}</span>
+        <div class="stats">
+          <span class="c" data-l="Win 1d">${s.win_rate_1d}</span>
+          <span class="c" data-l="Win 5d">${s.win_rate}</span>
+          <span class="c" data-l="Win 30d">${s.win_rate_30d}</span>
+          <span class="c ${pctTone(s.avg_ret_1d)}" data-l="Avg 1d">${s.avg_ret_1d}</span>
+          <span class="c ${pctTone(s.avg_ret_5d)}" data-l="Avg 5d">${s.avg_ret_5d}</span>
+          <span class="c ${pctTone(s.avg_ret_30d)}" data-l="Avg 30d">${s.avg_ret_30d}</span>
+        </div>
+      </button>
+      <div class="detail">
+        <div class="desc"><p>${s.description}</p><p class="rule">Fires when: ${s.trigger_desc}</p></div>
+        <div class="vals">${valueRows(k, v).map(([l,val,t])=>`<div><span>${l}</span><b class="${t||""}">${val}</b></div>`).join("")}</div>
+      </div></div>`;
+  }).join("");
+}
+document.addEventListener("click", e=>{
+  const row = e.target.closest(".row"); if(!row || !e.target.closest("button")) return;
+  const k = row.dataset.k;
+  open.has(k) ? open.delete(k) : open.add(k);
+  row.classList.toggle("open");
+  row.querySelector("button").setAttribute("aria-expanded", open.has(k));
+});
+
+function renderAlerts(alerts){
+  if (!alerts.length){ $("alerts").innerHTML = `<div class="empty">No alerts yet.</div>`; return; }
+  $("alerts").innerHTML = alerts.slice(0,10).map(a=>`<div class="alert">
+    <time>${a.date.slice(5)} ${a.time.slice(0,5)}</time>
+    <div><b>${NAMES[a.indicator]||a.indicator}</b> · ${a.message.split(" — ")[0]}</div></div>`).join("");
+}
+
+const $ = id => document.getElementById(id);
+function render(s){
+  if (s.spx_price!=null){
+    $("spx").textContent = s.spx_price.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+    $("spxChg").textContent = `${sg(s.spx_change)} (${sg(s.spx_change_pct)}%)`;
+    $("spxChg").className = "spx-chg num " + (s.spx_change>=0?"up":"down");
+  }
+  $("vix").textContent = f(s.vix);
+  $("ratio").textContent = f(s.vix_ratio,3);
+  $("ratio").className = "v num " + (s.vix_ratio>=1?"down":"");
+  $("skew").textContent = f(s.skew,1);
+  $("market").textContent = (s.market_open?"Market open":"Market closed") + (s.last_updated?` · updated ${s.last_updated}${s.tz?" "+s.tz:""}`:"");
+  renderSignals(s.signals||{});
+  renderAlerts(s.alerts||[]);
+}
+
+let timer;
+function connect(){
+  const ws = new WebSocket(`ws://${location.host}/ws`);
+  ws.onopen = ()=>{ $("dot").className="dot live"; $("conn").textContent="Live"; clearTimeout(timer); };
+  ws.onmessage = e=>{ try{ render(JSON.parse(e.data)); }catch(err){ console.error(err); } };
+  ws.onclose = ws.onerror = ()=>{ $("dot").className="dot"; $("conn").textContent="Reconnecting…"; clearTimeout(timer); timer=setTimeout(connect,4000); };
+}
+// Published copy: no server, so read state.json (rebuilt by a scheduled job) every minute.
+async function poll(){
+  try{
+    const r = await fetch("state.json", {cache:"no-store"});
+    if(!r.ok) throw new Error(r.status);
+    render(await r.json());
+    $("dot").className = "dot live"; $("conn").textContent = "Auto-updating";
+  }catch(e){ $("dot").className = "dot"; $("conn").textContent = "Data unavailable"; }
+}
+fetch("state.json", {method:"HEAD", cache:"no-store"})
+  .then(r => { if(r.ok){ poll(); setInterval(poll, 60000); } else connect(); })
+  .catch(() => connect());
+</script>
+</body>
+</html>
