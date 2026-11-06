@@ -123,8 +123,9 @@ h2{font-size:14px;font-weight:600;color:var(--muted);margin:32px 0 10px;text-tra
   <div class="method">
     <p>The score ranks signals by how well they did in a backtest of the S&amp;P 500. Higher is better. It only means something compared with the other signals here; it isn't a probability or a return.</p>
 
-    <h3>1. Backtest on five unseen periods</h3>
-    <p>Each signal is tested on five blocks of history it wasn't tuned on: 2012–13, 2014–15, 2016–17, 2018–19 and 2020 to <span id="statsEnd">Nov 2026</span>. A trade enters at the close of the day the signal fires, pays 0.05% in costs, and counts at most once per 5 trading days. Each measure below is averaged across the five periods.</p>
+    <h3>1. Test each 2-year period separately</h3>
+    <p>History is split into seven periods: 2012–13, 2014–15, 2016–17, 2018–19, 2020–21, 2022–23 and 2024 to <span id="statsEnd">Nov 2026</span>. Each signal is tested in each period on its own, and every measure below is the average of the seven, so a strong run in one market can't carry the score. A trade enters at the close of the day the signal fires, pays 0.05% in costs, and counts at most once per 5 trading days.</p>
+    <p>Signal rules use fixed levels, so nothing is fitted period by period. The exception: the zone levels for the three positioning signals (inverse ETF, vol-target, breadth) were chosen after looking at the full 2012–2026 history, so their results are less of an out-of-sample test.</p>
 
     <h3>2. Rescale each measure from 0 to 1</h3>
     <p>For each measure, the best signal gets 1, the worst gets 0, and the rest fall in between. That puts win rates, Sharpe ratios and signal counts on the same scale.</p>
@@ -137,12 +138,12 @@ h2{font-size:14px;font-weight:600;color:var(--muted);margin:32px 0 10px;text-tra
         <tr><td>Win rate, 5 days</td><td>Share of signals where the S&amp;P was up 5 days later</td><td class="num">+28%</td></tr>
         <tr><td>Win rate, 1 day</td><td>Share of signals where the S&amp;P was up the next day</td><td class="num">+12%</td></tr>
         <tr><td>Signal count</td><td>How often it fires; more trades means more confidence</td><td class="num">+5%</td></tr>
-        <tr><td>Consistency</td><td>How little the win rates vary between the five periods</td><td class="num">+5%</td></tr>
+        <tr><td>Consistency</td><td>How little the win rates vary between the seven periods</td><td class="num">+5%</td></tr>
         <tr><td>Worst loss</td><td>Worst single 5-day return after a signal; a milder worst case scores higher</td><td class="num">+10%</td></tr>
         <tr><td>False positives</td><td>Share of signals followed by a 5-day loss worse than −2%</td><td class="num neg">−15%</td></tr>
       </tbody>
     </table>
-    <p class="fine">Scores can run from −0.15 to 0.90. Stats were last refreshed <span id="statsGen">–</span>, using data through <span id="statsThru">–</span>. The 0-to-1 scaling uses the original signals that fire at least 10 times per period on average; the three positioning signals (inverse ETF, vol-target, breadth) are scored against those same ranges, so adding them doesn't shift anyone else's score. The 30-day columns are shown for reference but don't count toward the score.</p>
+    <p class="fine">Scores can run from −0.15 to 0.90. Stats were last refreshed <span id="statsGen">–</span>, using data through <span id="statsThru">–</span>. The 0-to-1 scaling uses the original signals that fire at least 7 times per period on average; the three positioning signals (inverse ETF, vol-target, breadth) are scored against those same ranges, so adding them doesn't shift anyone else's score. The 30-day columns are shown for reference but don't count toward the score.</p>
   </div>
 </main>
 

@@ -41,7 +41,7 @@ dashboard_state: dict = {
 
 alert_log: list = []
 
-# ── CV-validated stats (5-fold cross-validation 2012–2026) ────────────────────
+# ── Backtest stats (fallback; signal_stats.json overrides — 7 two-year periods 2012–2026) ─────────────────────
 SIGNAL_META = {
     "vix_vix3m_backwardation": {
         "label": "VIX BACKWARDATION", "rank": 1,

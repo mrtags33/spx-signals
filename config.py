@@ -16,16 +16,19 @@ TRAIN_END   = "2019-12-31"
 VAL_START   = "2020-01-01"
 VAL_END     = "2026-11-06"
 
-# ── Time-series cross-validation folds (expanding / anchored window) ───────────
-# Each fold trains on all data up to fold boundary, validates on next 2-year block.
-# Fold 5 uses the extended validation period through today.
+# ── Time-series test periods ──────────────────────────────────────────────────
+# Seven 2-year blocks (the last runs to the latest data). The train columns are kept
+# for the expanding-window layout, but signal thresholds are fixed, so nothing is fitted
+# on them: each block is simply tested separately and the results are averaged.
 CV_FOLDS = [
     # (train_start, train_end, val_start, val_end)
-    ("2010-01-01", "2011-12-31", "2012-01-01", "2013-12-31"),  # fold 1
-    ("2010-01-01", "2013-12-31", "2014-01-01", "2015-12-31"),  # fold 2
-    ("2010-01-01", "2015-12-31", "2016-01-01", "2017-12-31"),  # fold 3
-    ("2010-01-01", "2017-12-31", "2018-01-01", "2019-12-31"),  # fold 4
-    ("2010-01-01", "2019-12-31", "2020-01-01", "2026-11-06"),  # fold 5 (recent; end is exclusive for downloads)
+    ("2010-01-01", "2011-12-31", "2012-01-01", "2013-12-31"),  # 1
+    ("2010-01-01", "2013-12-31", "2014-01-01", "2015-12-31"),  # 2
+    ("2010-01-01", "2015-12-31", "2016-01-01", "2017-12-31"),  # 3
+    ("2010-01-01", "2017-12-31", "2018-01-01", "2019-12-31"),  # 4
+    ("2010-01-01", "2019-12-31", "2020-01-01", "2021-12-31"),  # 5
+    ("2010-01-01", "2021-12-31", "2022-01-01", "2023-12-31"),  # 6
+    ("2010-01-01", "2023-12-31", "2024-01-01", "2026-11-06"),  # 7 (latest; end is exclusive for downloads)
 ]
 
 # ── Backtest params ───────────────────────────────────────────────────────────
@@ -34,7 +37,7 @@ PRIMARY_HOLD     = 5              # hold period used for headline win rate
 SECONDARY_HOLD   = 1              # additional hold period for 1-day win rate
 SLIPPAGE         = 0.0005         # 0.05% one-way (applied to each trade)
 CLUSTER_COOLDOWN = 5              # bars to suppress after a signal fires
-MIN_SIGNALS      = 10             # discard indicators with fewer signals
+MIN_SIGNALS      = 7              # min average signals per test period (~3.4 a year) to join the scoring pool
 
 # ── Indicator parameters ──────────────────────────────────────────────────────
 RSI_PERIOD       = 14
