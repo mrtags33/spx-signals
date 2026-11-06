@@ -14,7 +14,7 @@ VXST_TICKER  = "^VXST"   # CBOE 9-day VIX (short-term implied volatility)
 TRAIN_START = "2010-01-01"
 TRAIN_END   = "2019-12-31"
 VAL_START   = "2020-01-01"
-VAL_END     = "2026-03-12"
+VAL_END     = "2026-11-06"
 
 # ── Time-series cross-validation folds (expanding / anchored window) ───────────
 # Each fold trains on all data up to fold boundary, validates on next 2-year block.
@@ -25,7 +25,7 @@ CV_FOLDS = [
     ("2010-01-01", "2013-12-31", "2014-01-01", "2015-12-31"),  # fold 2
     ("2010-01-01", "2015-12-31", "2016-01-01", "2017-12-31"),  # fold 3
     ("2010-01-01", "2017-12-31", "2018-01-01", "2019-12-31"),  # fold 4
-    ("2010-01-01", "2019-12-31", "2020-01-01", "2026-03-12"),  # fold 5 (recent)
+    ("2010-01-01", "2019-12-31", "2020-01-01", "2026-11-06"),  # fold 5 (recent; end is exclusive for downloads)
 ]
 
 # ── Backtest params ───────────────────────────────────────────────────────────
@@ -70,13 +70,13 @@ VXST_VIX_PANIC       = 1.15   # VXST/VIX ratio above this = acute short-term pan
 # Composite: signals must all fire within this many bars of each other
 COMPOSITE_WINDOW = 3
 
-# ── Ranking weights (negative = lower is better) ──────────────────────────────
+# ── Ranking weights (negative = lower is better; max_drawdown is stored negative, so higher is better) ──────────────────────────────
 RANKING_WEIGHTS = {
     "win_rate_5d":          0.28,
     "win_rate_1d":          0.12,
     "sharpe":               0.30,
     "false_positive_rate": -0.15,
-    "max_drawdown":        -0.10,
+    "max_drawdown":         0.10,   # worst 5d return (negative); closer to 0 = better, so positive weight
     "n_signals":            0.05,
 }
 TOP_N_CURVES = 5

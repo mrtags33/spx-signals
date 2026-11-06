@@ -124,7 +124,7 @@ h2{font-size:14px;font-weight:600;color:var(--muted);margin:32px 0 10px;text-tra
     <p>The score ranks signals by how well they did in a backtest of the S&amp;P 500. Higher is better. It only means something compared with the other signals here; it isn't a probability or a return.</p>
 
     <h3>1. Backtest on five unseen periods</h3>
-    <p>Each signal is tested on five blocks of history it wasn't tuned on: 2012–13, 2014–15, 2016–17, 2018–19 and 2020–Mar 2026. A trade enters at the close of the day the signal fires, pays 0.05% in costs, and counts at most once per 5 trading days. Each measure below is averaged across the five periods.</p>
+    <p>Each signal is tested on five blocks of history it wasn't tuned on: 2012–13, 2014–15, 2016–17, 2018–19 and 2020 to <span id="statsEnd">Nov 2026</span>. A trade enters at the close of the day the signal fires, pays 0.05% in costs, and counts at most once per 5 trading days. Each measure below is averaged across the five periods.</p>
 
     <h3>2. Rescale each measure from 0 to 1</h3>
     <p>For each measure, the best signal gets 1, the worst gets 0, and the rest fall in between. That puts win rates, Sharpe ratios and signal counts on the same scale.</p>
@@ -138,12 +138,11 @@ h2{font-size:14px;font-weight:600;color:var(--muted);margin:32px 0 10px;text-tra
         <tr><td>Win rate, 1 day</td><td>Share of signals where the S&amp;P was up the next day</td><td class="num">+12%</td></tr>
         <tr><td>Signal count</td><td>How often it fires; more trades means more confidence</td><td class="num">+5%</td></tr>
         <tr><td>Consistency</td><td>How little the win rates vary between the five periods</td><td class="num">+5%</td></tr>
+        <tr><td>Worst loss</td><td>Worst single 5-day return after a signal; a milder worst case scores higher</td><td class="num">+10%</td></tr>
         <tr><td>False positives</td><td>Share of signals followed by a 5-day loss worse than −2%</td><td class="num neg">−15%</td></tr>
-        <tr><td>Worst loss</td><td>Worst single 5-day return after a signal<sup>*</sup></td><td class="num neg">−10%</td></tr>
       </tbody>
     </table>
-    <p class="fine">Scores can run from about −0.25 to 0.80. Signals that fire fewer than 10 times per period on average are left out of the 0-to-1 scaling; the three positioning signals (inverse ETF, vol-target, breadth) fire less often, so they're scored against the other signals' ranges instead. The 30-day columns are shown for reference but don't count toward the score.</p>
-    <p class="fine"><sup>*</sup>Known issue: this term currently has its sign reversed, so signals with a <em>smaller</em> worst loss lose up to 0.10 points instead of gaining them. A corrected ranking is pending.</p>
+    <p class="fine">Scores can run from −0.15 to 0.90. Stats were last refreshed <span id="statsGen">–</span>, using data through <span id="statsThru">–</span>. The 0-to-1 scaling uses the original signals that fire at least 10 times per period on average; the three positioning signals (inverse ETF, vol-target, breadth) are scored against those same ranges, so adding them doesn't shift anyone else's score. The 30-day columns are shown for reference but don't count toward the score.</p>
   </div>
 </main>
 
@@ -313,6 +312,12 @@ function render(s){
   $("ratio").className = "v num " + (s.vix_ratio>=1?"down":"");
   $("skew").textContent = f(s.skew,1);
   $("market").textContent = (s.market_open?"Market open":"Market closed") + (s.last_updated?` · updated ${s.last_updated}${s.tz?" "+s.tz:""}`:"");
+  if (s.stats_info && s.stats_info.data_through){
+    const d = x => new Date(x+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"});
+    $("statsGen").textContent = d(s.stats_info.generated);
+    $("statsThru").textContent = d(s.stats_info.data_through);
+    $("statsEnd").textContent = new Date(s.stats_info.data_through+"T12:00:00").toLocaleDateString("en-US",{month:"short",year:"numeric"});
+  }
   renderSignals(s.signals||{});
   renderAlerts(s.alerts||[]);
 }

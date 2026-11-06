@@ -174,9 +174,19 @@ SIGNAL_META = {
     },
 }
 
-# Rank every signal by its CV score, highest first
-for _i, _k in enumerate(sorted(SIGNAL_META, key=lambda k: -float(SIGNAL_META[k]["cv_score"])), 1):
-    SIGNAL_META[_k]["rank"] = _i
+# Backtest stats, score and rank come from signal_stats.json (refresh_dashboard_stats.py);
+# the numbers typed above are only a fallback if that file is missing.
+_STATS_FILE = Path(__file__).parent / "signal_stats.json"
+STATS_INFO: dict = {}
+if _STATS_FILE.exists():
+    _stats = json.loads(_STATS_FILE.read_text())
+    STATS_INFO = {k: _stats.get(k) for k in ("generated", "data_through", "periods")}
+    for _k, _s in _stats["signals"].items():
+        if _k in SIGNAL_META:
+            SIGNAL_META[_k].update(_s)
+else:
+    for _i, _k in enumerate(sorted(SIGNAL_META, key=lambda k: -float(SIGNAL_META[k]["cv_score"])), 1):
+        SIGNAL_META[_k]["rank"] = _i
 
 POSITIONING_KEYS = ["inverse_etf_fear", "vol_target_washout", "breadth_washout"]
 POSITIONING_TTL = 30 * 60   # seconds between refreshes (these are daily-close signals)
@@ -709,6 +719,7 @@ async def update_state() -> None:
             "skew":           round(skew_now, 2) if skew_now else None,
             "last_updated":   datetime.now().strftime("%H:%M:%S"),
             "market_open":    is_market_open(),
+            "stats_info":     STATS_INFO,
             "signals": signals_out,
             "alerts":  alert_log[:100],
         }
