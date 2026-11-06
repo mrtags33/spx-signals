@@ -70,6 +70,16 @@ h2{font-size:14px;font-weight:600;color:var(--muted);margin:32px 0 10px;text-tra
 .alert:first-child{border-top:0}
 .alert time{color:var(--muted);font-size:13px}
 .empty{color:var(--muted);padding:12px 0;font-size:14px}
+.method{background:var(--card);border:1px solid var(--rule);border-radius:12px;padding:20px 22px;font-size:14.5px}
+.method p{margin:0 0 12px;max-width:78ch}
+.method h3{font-size:15px;font-weight:600;margin:18px 0 6px}
+.method h3:first-of-type{margin-top:6px}
+.weights{width:100%;border-collapse:collapse;margin:4px 0 14px;font-size:14px}
+.weights th,.weights td{padding:8px 10px;border-bottom:1px solid var(--rule);text-align:left;vertical-align:top}
+.weights th{font-size:12px;color:var(--muted);font-weight:500}
+.weights td:last-child,.weights th:last-child{text-align:right;white-space:nowrap}
+.weights td.num{color:var(--up)} .weights td.neg{color:var(--down)}
+.method .fine{font-size:13px;color:var(--muted)}
 
 @media (max-width:900px){
   .thead{display:none}
@@ -108,6 +118,33 @@ h2{font-size:14px;font-weight:600;color:var(--muted);margin:32px 0 10px;text-tra
 
   <h2>Recent alerts</h2>
   <div class="alerts" id="alerts"><div class="empty">No alerts yet.</div></div>
+
+  <h2 id="score">How the score works</h2>
+  <div class="method">
+    <p>The score ranks signals by how well they did in a backtest of the S&amp;P 500. Higher is better. It only means something compared with the other signals here; it isn't a probability or a return.</p>
+
+    <h3>1. Backtest on five unseen periods</h3>
+    <p>Each signal is tested on five blocks of history it wasn't tuned on: 2012–13, 2014–15, 2016–17, 2018–19 and 2020–Mar 2026. A trade enters at the close of the day the signal fires, pays 0.05% in costs, and counts at most once per 5 trading days. Each measure below is averaged across the five periods.</p>
+
+    <h3>2. Rescale each measure from 0 to 1</h3>
+    <p>For each measure, the best signal gets 1, the worst gets 0, and the rest fall in between. That puts win rates, Sharpe ratios and signal counts on the same scale.</p>
+
+    <h3>3. Weight and add them up</h3>
+    <table class="weights">
+      <thead><tr><th>Measure</th><th>What it is</th><th>Weight</th></tr></thead>
+      <tbody>
+        <tr><td>Sharpe ratio</td><td>Average 5-day return ÷ its volatility, annualised (×√252). Rewards steady gains.</td><td class="num">+30%</td></tr>
+        <tr><td>Win rate, 5 days</td><td>Share of signals where the S&amp;P was up 5 days later</td><td class="num">+28%</td></tr>
+        <tr><td>Win rate, 1 day</td><td>Share of signals where the S&amp;P was up the next day</td><td class="num">+12%</td></tr>
+        <tr><td>Signal count</td><td>How often it fires; more trades means more confidence</td><td class="num">+5%</td></tr>
+        <tr><td>Consistency</td><td>How little the win rates vary between the five periods</td><td class="num">+5%</td></tr>
+        <tr><td>False positives</td><td>Share of signals followed by a 5-day loss worse than −2%</td><td class="num neg">−15%</td></tr>
+        <tr><td>Worst loss</td><td>Worst single 5-day return after a signal<sup>*</sup></td><td class="num neg">−10%</td></tr>
+      </tbody>
+    </table>
+    <p class="fine">Scores can run from about −0.25 to 0.80. Signals that fire fewer than 10 times per period on average are left out of the 0-to-1 scaling; the three positioning signals (inverse ETF, vol-target, breadth) fire less often, so they're scored against the other signals' ranges instead. The 30-day columns are shown for reference but don't count toward the score.</p>
+    <p class="fine"><sup>*</sup>Known issue: this term currently has its sign reversed, so signals with a <em>smaller</em> worst loss lose up to 0.10 points instead of gaining them. A corrected ranking is pending.</p>
+  </div>
 </main>
 
 <script>
