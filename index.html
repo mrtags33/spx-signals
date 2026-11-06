@@ -134,16 +134,18 @@ h2{font-size:14px;font-weight:600;color:var(--muted);margin:32px 0 10px;text-tra
     <table class="weights">
       <thead><tr><th>Measure</th><th>What it is</th><th>Weight</th></tr></thead>
       <tbody>
-        <tr><td>Sharpe ratio</td><td>Average 5-day return ÷ its volatility, annualised (×√252). Rewards steady gains.</td><td class="num">+30%</td></tr>
-        <tr><td>Win rate, 5 days</td><td>Share of signals where the S&amp;P was up 5 days later</td><td class="num">+28%</td></tr>
-        <tr><td>Win rate, 1 day</td><td>Share of signals where the S&amp;P was up the next day</td><td class="num">+12%</td></tr>
-        <tr><td>Signal count</td><td>How often it fires; more trades means more confidence</td><td class="num">+5%</td></tr>
-        <tr><td>Consistency</td><td>How little the win rates vary between the seven periods</td><td class="num">+5%</td></tr>
+        <tr><td>Sharpe ratio, 5 days</td><td>Average 5-day return ÷ its volatility. Rewards steady short-term gains.</td><td class="num">+18%</td></tr>
+        <tr><td>Win rate, 5 days</td><td>Share of signals where the S&amp;P was up 5 days later</td><td class="num">+17%</td></tr>
+        <tr><td>Sharpe ratio, 30 days</td><td>Average 30-day return ÷ its volatility</td><td class="num">+18%</td></tr>
+        <tr><td>Win rate, 30 days</td><td>Share of signals where the S&amp;P was up 30 trading days later</td><td class="num">+17%</td></tr>
+        <tr><td>Win rate, 1 day</td><td>Share of signals where the S&amp;P was up the next day</td><td class="num">+10%</td></tr>
         <tr><td>Worst loss</td><td>Worst single 5-day return after a signal; a milder worst case scores higher</td><td class="num">+10%</td></tr>
+        <tr><td>Signal count</td><td>How often it fires; more trades means more confidence</td><td class="num">+5%</td></tr>
+        <tr><td>Consistency</td><td>How little the 1, 5 and 30-day win rates vary between the seven periods</td><td class="num">+5%</td></tr>
         <tr><td>False positives</td><td>Share of signals followed by a 5-day loss worse than −2%</td><td class="num neg">−15%</td></tr>
       </tbody>
     </table>
-    <p class="fine">Scores can run from −0.15 to 0.90. Stats were last refreshed <span id="statsGen">–</span>, using data through <span id="statsThru">–</span>. The 0-to-1 scaling uses the original signals that fire at least 7 times per period on average; the three positioning signals (inverse ETF, vol-target, breadth) are scored against those same ranges, so adding them doesn't shift anyone else's score. The 30-day columns are shown for reference but don't count toward the score.</p>
+    <p class="fine">The 5-day and 30-day measures carry equal weight (35% each). Scores can run from −0.15 to 1.00. Stats were last refreshed <span id="statsGen">–</span>, using data through <span id="statsThru">–</span>. The 0-to-1 scaling uses the original signals that fire at least 7 times per period on average; the three positioning signals (inverse ETF, vol-target, breadth) are scored against those same ranges, so adding them doesn't shift anyone else's score.</p>
   </div>
 </main>
 

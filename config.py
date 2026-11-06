@@ -32,7 +32,7 @@ CV_FOLDS = [
 ]
 
 # ── Backtest params ───────────────────────────────────────────────────────────
-HOLD_PERIODS     = [1, 2, 3, 5]   # days to measure forward return
+HOLD_PERIODS     = [1, 2, 3, 5, 30]   # days to measure forward return
 PRIMARY_HOLD     = 5              # hold period used for headline win rate
 SECONDARY_HOLD   = 1              # additional hold period for 1-day win rate
 SLIPPAGE         = 0.0005         # 0.05% one-way (applied to each trade)
@@ -75,11 +75,14 @@ COMPOSITE_WINDOW = 3
 
 # ── Ranking weights (negative = lower is better; max_drawdown is stored negative, so higher is better) ──────────────────────────────
 RANKING_WEIGHTS = {
-    "win_rate_5d":          0.28,
-    "win_rate_1d":          0.12,
-    "sharpe":               0.30,
-    "false_positive_rate": -0.15,
+    # 5-day and 30-day horizons carry equal weight (0.35 each); 1-day is a smaller check
+    "win_rate_1d":          0.10,
+    "win_rate_5d":          0.17,
+    "sharpe":               0.18,   # 5-day returns
+    "win_rate_30d":         0.17,
+    "sharpe_30d":           0.18,
     "max_drawdown":         0.10,   # worst 5d return (negative); closer to 0 = better, so positive weight
+    "false_positive_rate": -0.15,
     "n_signals":            0.05,
 }
 TOP_N_CURVES = 5
