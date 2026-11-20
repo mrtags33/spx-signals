@@ -628,6 +628,62 @@ def alert_message(key: str, v: dict) -> str:
     return f"{key} fired"
 
 
+# ── Price signals + "Active" look-back ─────────────────────────────────────────
+
+ACTIVE_LOOKBACK = 5   # sessions a fired cross signal stays "Active"
+
+# Cross signals whose setup persists after the cross: Active also needs this to still hold.
+# Signals not listed are one-off events (band touch, bounce, VIX drop…) and stay
+# Active for the look-back window alone.
+IN_EFFECT = {
+    "vix_vix3m_backwardation": lambda v: v["ratio"] < 1.0,
+    "macd_line_cross":         lambda v: v["gap"] > 0,
+    "macd_histogram_pos":      lambda v: v["histogram"] > 0,
+    "rsi_cross_40":            lambda v: v["rsi"] > 40,
+    "price_cross_50ma":        lambda v: bool(v["above_ma"]),
+    "skew_tail_risk_spike":    lambda v: bool(v.get("above_130")),
+}
+
+
+def compute_price_signals(data: dict) -> dict:
+    close = data[config.SPX_TICKER]["Close"]
+    return {
+        "vix_vix3m_backwardation":  signal_vix_ratio(data),
+        "skew_tail_risk_resolving": signal_skew_resolving(data),
+        "bollinger_lower":          signal_bollinger_lower(close),
+        "vix_fear_capitulation":    signal_vix_fear_cap(data),
+        "fib_retracement_bounce":   signal_fib_bounce(close),
+        "skew_tail_risk_spike":     signal_skew_spike(data),
+        "macd_line_cross":          signal_macd(close),
+        "macd_histogram_pos":       signal_macd_histogram(close),
+        "rsi_cross_40":             signal_rsi_cross_40(close),
+        "obv_divergence":           signal_obv_divergence(data),
+        "price_cross_50ma":         signal_price_cross_50ma(close),
+    }
+
+
+def sessions_since_fire(data: dict, today: dict) -> dict:
+    """{signal: n} for price signals that fired n sessions ago (1..ACTIVE_LOOKBACK)
+    and are still in effect today. Replays the signal code on data cut back n bars."""
+    out = {}
+    for n in range(1, ACTIVE_LOOKBACK + 1):
+        past = {t: df.iloc[:-n] for t, df in data.items()}
+        try:
+            then = compute_price_signals(past)
+        except Exception:
+            break
+        for key, v in then.items():
+            if key in out or today[key]["fired"] or not v["fired"]:
+                continue
+            check = IN_EFFECT.get(key)
+            try:
+                if check is None or check(today[key]):
+                    out[key] = n
+            except (KeyError, TypeError):
+                pass
+    return out
+
+
 # ── Core update loop ───────────────────────────────────────────────────────────
 
 async def update_state() -> None:
@@ -650,19 +706,8 @@ async def update_state() -> None:
         vix3m_now = float(data[config.VIX3M_TICKER]["Close"].iloc[-1]) if config.VIX3M_TICKER in data else None
         skew_now  = float(data[config.SKEW_TICKER]["Close"].iloc[-1]) if config.SKEW_TICKER in data else None
 
-        computed = {
-            "vix_vix3m_backwardation":  signal_vix_ratio(data),
-            "skew_tail_risk_resolving": signal_skew_resolving(data),
-            "bollinger_lower":          signal_bollinger_lower(close),
-            "vix_fear_capitulation":    signal_vix_fear_cap(data),
-            "fib_retracement_bounce":   signal_fib_bounce(close),
-            "skew_tail_risk_spike":     signal_skew_spike(data),
-            "macd_line_cross":          signal_macd(close),
-            "macd_histogram_pos":       signal_macd_histogram(close),
-            "rsi_cross_40":             signal_rsi_cross_40(close),
-            "obv_divergence":           signal_obv_divergence(data),
-            "price_cross_50ma":         signal_price_cross_50ma(close),
-        }
+        computed = compute_price_signals(data)
+        fired_ago = sessions_since_fire(data, computed)
         if positioning_cache["values"]:
             computed.update(positioning_cache["values"])
 
@@ -683,8 +728,12 @@ async def update_state() -> None:
 
         alert_log = new_alerts + alert_log
 
-        def status(v):
-            return "TRIGGERED" if v["fired"] else ("ARMED" if v["armed"] else "WATCHING")
+        def status(key, v):
+            if v["fired"]:
+                return "TRIGGERED"
+            if key in fired_ago:
+                return "ACTIVE"
+            return "ARMED" if v["armed"] else "WATCHING"
 
         signals_out = {}
         for key, v in computed.items():
@@ -692,7 +741,8 @@ async def update_state() -> None:
             signals_out[key] = {
                 "label":           meta["label"],
                 "rank":            meta["rank"],
-                "status":          status(v),
+                "status":          status(key, v),
+                "fired_ago":       fired_ago.get(key),
                 "win_rate_1d":     meta["win_rate_1d"],
                 "win_rate_1d_std": meta["win_rate_1d_std"],
                 "win_rate":        meta["win_rate"],
@@ -751,10 +801,12 @@ async def polling_loop() -> None:
         ratio       = dashboard_state.get("vix_ratio")
         n_triggered = sum(1 for s in dashboard_state.get("signals", {}).values()
                           if s.get("status") == "TRIGGERED")
+        n_active    = sum(1 for s in dashboard_state.get("signals", {}).values()
+                          if s.get("status") == "ACTIVE")
         n_armed     = sum(1 for s in dashboard_state.get("signals", {}).values()
                           if s.get("status") == "ARMED")
         print(f"  SPX {spx} | VIX/VIX3M {ratio} | "
-              f"TRIGGERED={n_triggered} ARMED={n_armed} | clients={len(clients)}")
+              f"TRIGGERED={n_triggered} ACTIVE={n_active} ARMED={n_armed} | clients={len(clients)}")
         await asyncio.sleep(60)
 
 
