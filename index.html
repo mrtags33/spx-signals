@@ -36,7 +36,7 @@ h2{font-size:14px;font-weight:600;color:var(--muted);margin:32px 0 10px;text-tra
 .list{background:var(--card);border:1px solid var(--rule);border-radius:12px;overflow:hidden}
 .row{border-top:1px solid var(--rule)}
 .row:first-child{border-top:0}
-.cols{display:grid;grid-template-columns:28px minmax(200px,1fr) 96px 56px repeat(6,66px);align-items:center;gap:10px}
+.cols{display:grid;grid-template-columns:28px minmax(200px,1fr) 116px 56px repeat(6,66px);align-items:center;gap:10px}
 .cols > .c,.stats > .c{text-align:right}
 .stats{display:contents}
 .thead{padding:10px 16px;font-size:11.5px;color:var(--muted);border-bottom:1px solid var(--rule);background:#FAFBFC}
@@ -45,7 +45,7 @@ h2{font-size:14px;font-weight:600;color:var(--muted);margin:32px 0 10px;text-tra
 .c{font:500 14px "IBM Plex Mono",monospace}
 .c.score{color:var(--muted)}
 .row > button{all:unset;box-sizing:border-box;width:100%;padding:14px 16px;cursor:pointer}
-.row > button.cols{display:grid;grid-template-columns:28px minmax(200px,1fr) 96px 56px repeat(6,66px);align-items:center;gap:10px}
+.row > button.cols{display:grid;grid-template-columns:28px minmax(200px,1fr) 116px 56px repeat(6,66px);align-items:center;gap:10px}
 .row > button:hover{background:#FAFBFC}
 .row > button:focus-visible{outline:2px solid var(--ink);outline-offset:-2px}
 .name{font-weight:500}
@@ -54,6 +54,7 @@ h2{font-size:14px;font-weight:600;color:var(--muted);margin:32px 0 10px;text-tra
 .pill.triggered{background:var(--hot-bg);color:var(--hot)}
 .pill.armed{background:var(--warm-bg);color:var(--warm)}
 .pill.active{background:var(--live-bg);color:var(--live)}
+.pill.ongoing{background:transparent;color:var(--live);box-shadow:inset 0 0 0 1px var(--live)}
 .pill.watching{background:var(--idle-bg);color:var(--muted)}
 .detail{display:none;padding:2px 16px 18px 54px;font-size:13.5px;color:var(--muted)}
 .row.open .detail{display:grid;grid-template-columns:1fr 1fr;gap:24px}
@@ -168,7 +169,7 @@ const NAMES = {
   vol_target_washout: "Vol-target fund washout",
   breadth_washout: "Breadth wash-out",
 };
-const STATUS = {TRIGGERED:["triggered","Triggered"], ACTIVE:["active","Active"], ARMED:["armed","Armed"], WATCHING:["watching","Watching"]};
+const STATUS = {TRIGGERED:["triggered","Triggered"], ACTIVE:["active","Active"], ONGOING:["ongoing","Ongoing"], ARMED:["armed","Armed"], WATCHING:["watching","Watching"]};
 const f = (n,d=2) => n==null ? "–" : Number(n).toFixed(d);
 const sg = (n,d=2) => n==null ? "–" : (n>=0?"+":"") + Number(n).toFixed(d);
 
@@ -268,8 +269,16 @@ function renderSignals(sigs){
       <span class="c">Avg 1d</span><span class="c">Avg 5d</span><span class="c">Avg 30d</span></div>` +
   rows.map(([k,s])=>{
     let [cls,label] = STATUS[s.status] || STATUS.WATCHING;
-    const tip = s.status==="ACTIVE" && s.fired_ago ? `Fired ${s.fired_ago} session${s.fired_ago>1?"s":""} ago and still in effect` : "";
-    if (tip) label += ` · ${s.fired_ago}d`;
+    const plural = n => `${n} session${n>1?"s":""}`;
+    let tip = "";
+    if (s.status==="ACTIVE" && s.fired_ago){
+      tip = `Fired ${plural(s.fired_ago)} ago and still in effect`;
+      label += ` · ${s.fired_ago}d`;
+    } else if (s.status==="ONGOING" && s.ongoing){
+      const o = s.ongoing, n = `${o.sessions}d${o.capped?"+":""}`;
+      tip = `${o.desc} for ${o.capped?"at least ":""}${plural(o.sessions)}. The cross that fires this signal was before that, so the backtest stats don't apply to today`;
+      label += ` · ${n}`;
+    }
     const v = s.values || {};
     return `<div class="row${open.has(k)?" open":""}" data-k="${k}">
       <button type="button" class="cols" aria-expanded="${open.has(k)}">

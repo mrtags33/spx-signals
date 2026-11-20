@@ -662,6 +662,41 @@ def compute_price_signals(data: dict) -> dict:
     }
 
 
+# Stress conditions worth flagging for as long as they last, even after the cross has aged
+# out of the Active window. {signal: (bool series builder, short description)}.
+# Ordinary bullish states (MACD above signal, RSI > 40, above the 50-day…) are left out:
+# they hold most of the time, so an "Ongoing" flag on them would carry no information.
+def _skew_above(data):
+    return data[config.SKEW_TICKER]["Close"] > config.SKEW_HIGH_THRESHOLD
+
+def _below_band(data):
+    close = data[config.SPX_TICKER]["Close"]
+    return close <= BollingerBands(close, window=config.BB_PERIOD, window_dev=config.BB_STD).bollinger_lband()
+
+ONGOING = {
+    "skew_tail_risk_spike": (_skew_above, f"SKEW above {config.SKEW_HIGH_THRESHOLD:.0f}"),
+    "bollinger_lower":      (_below_band, "SPX below the lower Bollinger band"),
+}
+
+
+def ongoing_streaks(data: dict) -> dict:
+    """{signal: {"sessions": n, "capped": bool, "desc": str}} for ONGOING conditions true today.
+    n counts consecutive sessions back to today; capped means the streak reaches the
+    start of the downloaded history, so it is at least n."""
+    out = {}
+    for key, (build, desc) in ONGOING.items():
+        try:
+            cond = build(data).dropna().astype(bool)
+        except Exception:
+            continue
+        if cond.empty or not cond.iloc[-1]:
+            continue
+        breaks = (~cond).to_numpy().nonzero()[0]
+        n = len(cond) - (breaks[-1] + 1) if len(breaks) else len(cond)
+        out[key] = {"sessions": int(n), "capped": not len(breaks), "desc": desc}
+    return out
+
+
 def sessions_since_fire(data: dict, today: dict) -> dict:
     """{signal: n} for price signals that fired n sessions ago (1..ACTIVE_LOOKBACK)
     and are still in effect today. Replays the signal code on data cut back n bars."""
@@ -708,6 +743,7 @@ async def update_state() -> None:
 
         computed = compute_price_signals(data)
         fired_ago = sessions_since_fire(data, computed)
+        ongoing   = ongoing_streaks(data)
         if positioning_cache["values"]:
             computed.update(positioning_cache["values"])
 
@@ -733,6 +769,8 @@ async def update_state() -> None:
                 return "TRIGGERED"
             if key in fired_ago:
                 return "ACTIVE"
+            if key in ongoing:
+                return "ONGOING"
             return "ARMED" if v["armed"] else "WATCHING"
 
         signals_out = {}
@@ -743,6 +781,7 @@ async def update_state() -> None:
                 "rank":            meta["rank"],
                 "status":          status(key, v),
                 "fired_ago":       fired_ago.get(key),
+                "ongoing":         ongoing.get(key),
                 "win_rate_1d":     meta["win_rate_1d"],
                 "win_rate_1d_std": meta["win_rate_1d_std"],
                 "win_rate":        meta["win_rate"],
