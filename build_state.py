@@ -30,7 +30,8 @@ POSITIONING = HERE / "positioning.json"
 
 def main() -> int:
     if "--positioning" in sys.argv:
-        vals = b.compute_positioning()
+        prev = json.loads(POSITIONING.read_text())["values"] if POSITIONING.exists() else None
+        vals = b.compute_positioning(previous=prev)
         POSITIONING.write_text(json.dumps({"updated": time.strftime("%Y-%m-%d %H:%M"), "values": vals}))
         print("positioning.json refreshed")
 

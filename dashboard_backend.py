@@ -193,39 +193,38 @@ POSITIONING_TTL = 30 * 60   # seconds between refreshes (these are daily-close s
 positioning_cache: dict = {"at": 0.0, "values": None}
 
 
-def compute_positioning() -> dict | None:
-    """Download ETF volume, member closes and SPX history; evaluate the 3 signals."""
-    from indicators.inverse_etf_ratio import INVERSE, LEVERAGED
+def compute_positioning(previous: dict | None = None) -> dict | None:
+    """Download ETF volume, member closes and SPX history; evaluate the 3 signals.
+
+    If an ETF is still missing after retries, the inverse ETF signal is not recomputed
+    from a partial basket: the previous reading is kept and marked stale (or, with no
+    previous reading, the refresh fails)."""
+    from indicators.inverse_etf_ratio import download_dollar_volume
     from data.positioning import breadth_50dma, vol_target_frame
     import indicators.positioning as P
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        etf = yf.download(INVERSE + LEVERAGED, period="40d", auto_adjust=False, progress=False, threads=True)
+        dv, missing = download_dollar_volume(period="40d")
         spx = yf.download(config.SPX_TICKER, period="2y", auto_adjust=True, progress=False)["Close"].squeeze()
-    dv = (etf["Close"] * etf["Volume"]).fillna(0.0)
-    inv_d = dv[[t for t in INVERSE if t in dv]].sum(axis=1)
-    lev_d = dv[[t for t in LEVERAGED if t in dv]].sum(axis=1)
-    inv5, lev5 = inv_d.rolling(5).sum(), lev_d.rolling(5).sum()
-    share = (inv5 / (inv5 + lev5)).dropna()
-    share_1d = float(inv_d.iloc[-1] / (inv_d.iloc[-1] + lev_d.iloc[-1]))
+    if missing:
+        prev = (previous or {}).get("inverse_etf_fear")
+        if not prev:
+            raise RuntimeError(f"no ETF volume for {missing} and no previous reading to keep")
+        print(f"  Keeping the previous inverse ETF reading; still missing {missing}")
+        inverse_vals = {**prev, "new_entry": False, "stale": True, "missing": missing}
+    else:
+        inverse_vals = inverse_share_values(dv)
 
     vt = vol_target_frame(spx).dropna()
     br = breadth_50dma(recent_days=130).dropna()
 
-    s_now, s_prev = float(share.iloc[-1]), float(share.iloc[-2])
     z_now, z_prev = float(vt["z"].iloc[-1]), float(vt["z"].iloc[-2])
     b_now, b_prev = float(br.iloc[-1]), float(br.iloc[-2])
     b_min10 = float(br.iloc[-10:].min())
-    ia, it, istrong = P.INV_ZONE
     va, vt_, vstrong = P.VOLT_ZONE
     ba, bt, bstrong = P.BREADTH_ZONE
     return {
-        "inverse_etf_fear": {
-            "fired": s_now >= it, "armed": ia <= s_now < it, "new_entry": s_now >= it > s_prev,
-            "strong": s_now >= istrong,
-            "share_5d": s_now, "share_prev": s_prev, "share_1d": share_1d,
-            "inv_bn": float(inv_d.iloc[-1]) / 1e9, "lev_bn": float(lev_d.iloc[-1]) / 1e9,
-        },
+        "inverse_etf_fear": inverse_vals,
         "vol_target_washout": {
             "fired": z_now <= vt_, "armed": vt_ < z_now <= va, "new_entry": z_now <= vt_ < z_prev,
             "strong": z_now <= vstrong,
@@ -240,12 +239,32 @@ def compute_positioning() -> dict | None:
     }
 
 
+def inverse_share_values(dv: pd.DataFrame) -> dict:
+    """Inverse ETF fear signal from a complete dollar-volume frame."""
+    from indicators.inverse_etf_ratio import INVERSE, LEVERAGED
+    import indicators.positioning as P
+    dv = dv.fillna(0.0)
+    inv_d = dv[INVERSE].sum(axis=1)
+    lev_d = dv[LEVERAGED].sum(axis=1)
+    inv5, lev5 = inv_d.rolling(5).sum(), lev_d.rolling(5).sum()
+    share = (inv5 / (inv5 + lev5)).dropna()
+    s_now, s_prev = float(share.iloc[-1]), float(share.iloc[-2])
+    ia, it, istrong = P.INV_ZONE
+    return {
+        "fired": s_now >= it, "armed": ia <= s_now < it, "new_entry": s_now >= it > s_prev,
+        "strong": s_now >= istrong,
+        "share_5d": s_now, "share_prev": s_prev,
+        "share_1d": float(inv_d.iloc[-1] / (inv_d.iloc[-1] + lev_d.iloc[-1])),
+        "inv_bn": float(inv_d.iloc[-1]) / 1e9, "lev_bn": float(lev_d.iloc[-1]) / 1e9,
+    }
+
+
 async def positioning_loop() -> None:
     """Refresh the positioning signals in a worker thread so the 60s loop never waits."""
     import time
     while True:
         try:
-            vals = await asyncio.to_thread(compute_positioning)
+            vals = await asyncio.to_thread(compute_positioning, positioning_cache["values"])
             if vals:
                 positioning_cache.update(at=time.time(), values=vals)
                 print("  Positioning signals refreshed")

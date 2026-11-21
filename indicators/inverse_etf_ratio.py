@@ -8,6 +8,7 @@ against a trailing window only (no look-ahead), so a signal on day t uses data
 available at day t's close.
 """
 import sys
+import time
 from pathlib import Path
 
 import pandas as pd
@@ -25,15 +26,49 @@ RANK_WINDOW = 756    # ~3 years of trailing history for the percentile
 CACHE = Path(__file__).parent.parent / "data" / "cache" / "inverse_etf_dollar_volume.parquet"
 
 
+def download_dollar_volume(tickers: list[str] | None = None, retries: int = 3,
+                           **kw) -> tuple[pd.DataFrame, list[str]]:
+    """Daily dollar volume (unadjusted close x shares) per ETF -> (frame, still_missing).
+
+    Parallel yfinance downloads sometimes drop a ticker ('database is locked' from its
+    cache), which skews the share badly: losing SOXL alone moves it from ~40% to ~60%.
+    Tickers with no recent or no latest-day data are retried one at a time; whatever is
+    still missing after `retries` is returned so the caller can refuse to use the data.
+    kw goes to yf.download (start= or period=)."""
+    tickers = tickers or INVERSE + LEVERAGED
+    d = yf.download(tickers, auto_adjust=False, progress=False, threads=True, **kw)
+    dv = (d["Close"] * d["Volume"]).reindex(columns=tickers)
+
+    def gaps():
+        return [t for t in tickers if dv[t].iloc[-30:].fillna(0).sum() == 0
+                or pd.isna(dv[t].iloc[-1]) or dv[t].iloc[-1] == 0]
+
+    for attempt in range(1, retries + 1):
+        missing = gaps()
+        if not missing:
+            break
+        print(f"  ETF volume retry {attempt}/{retries}: {missing}", file=sys.stderr)
+        time.sleep(3 * attempt)
+        for t in missing:
+            one = yf.download(t, auto_adjust=False, progress=False, threads=False, **kw)
+            if one.empty:
+                continue
+            col = (one["Close"] * one["Volume"]).squeeze()
+            dv = dv.reindex(dv.index.union(col.index))
+            dv[t] = col
+    return dv, gaps()
+
+
 def load_dollar_volume(start: str = "2010-01-01", refresh: bool = False) -> pd.DataFrame:
     """Daily dollar volume (unadjusted close x shares) per ETF, cached to parquet."""
     if CACHE.exists() and not refresh:
         cached = pd.read_parquet(CACHE)
         if (pd.Timestamp.today().normalize() - cached.index.max()).days <= 3:
             return cached
-    d = yf.download(INVERSE + LEVERAGED, start=start, auto_adjust=False,
-                    progress=False, threads=True)
-    dv = (d["Close"] * d["Volume"]).fillna(0.0)
+    dv, missing = download_dollar_volume(start=start)
+    if missing:
+        raise RuntimeError(f"no ETF volume for {missing}; not caching a partial basket")
+    dv = dv.fillna(0.0)
     CACHE.parent.mkdir(parents=True, exist_ok=True)
     dv.to_parquet(CACHE)
     return dv
