@@ -180,7 +180,7 @@ _STATS_FILE = Path(__file__).parent / "signal_stats.json"
 STATS_INFO: dict = {}
 if _STATS_FILE.exists():
     _stats = json.loads(_STATS_FILE.read_text())
-    STATS_INFO = {k: _stats.get(k) for k in ("generated", "data_through", "periods")}
+    STATS_INFO = {k: _stats.get(k) for k in ("generated", "data_through", "periods", "baseline")}
     for _k, _s in _stats["signals"].items():
         if _k in SIGNAL_META:
             SIGNAL_META[_k].update(_s)
@@ -790,6 +790,9 @@ async def update_state() -> None:
                 "avg_ret_1d":      meta.get("avg_ret_1d",  "—"),
                 "avg_ret_5d":      meta.get("avg_ret_5d",  "—"),
                 "avg_ret_30d":     meta.get("avg_ret_30d", "—"),
+                **{f"{m}_rel": meta.get(f"{m}_rel", "—") for m in (
+                    "win_rate_1d", "win_rate_5d", "win_rate_30d", "avg_ret_1d", "avg_ret_5d", "avg_ret_30d")},
+                "n_signals":       meta.get("n_signals"),
                 "sharpe":          meta["sharpe"],
                 "cv_score":        meta["cv_score"],
                 "description":     meta["description"],

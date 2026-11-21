@@ -36,16 +36,17 @@ h2{font-size:14px;font-weight:600;color:var(--muted);margin:32px 0 10px;text-tra
 .list{background:var(--card);border:1px solid var(--rule);border-radius:12px;overflow:hidden}
 .row{border-top:1px solid var(--rule)}
 .row:first-child{border-top:0}
-.cols{display:grid;grid-template-columns:28px minmax(200px,1fr) 116px 56px repeat(6,66px);align-items:center;gap:10px}
+.cols{display:grid;grid-template-columns:28px minmax(200px,1fr) 116px 56px 44px repeat(6,66px);align-items:center;gap:10px}
 .cols > .c,.stats > .c{text-align:right}
 .stats{display:contents}
 .thead{padding:10px 16px;font-size:11.5px;color:var(--muted);border-bottom:1px solid var(--rule);background:#FAFBFC}
 .thead .grp{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em}
 .rank{font:500 13px "IBM Plex Mono",monospace;color:var(--muted)}
 .c{font:500 14px "IBM Plex Mono",monospace}
-.c.score{color:var(--muted)}
+.c.score,.c.n{color:var(--muted)}
+.note{font-size:13px;color:var(--muted);margin:-4px 0 12px}
 .row > button{all:unset;box-sizing:border-box;width:100%;padding:14px 16px;cursor:pointer}
-.row > button.cols{display:grid;grid-template-columns:28px minmax(200px,1fr) 116px 56px repeat(6,66px);align-items:center;gap:10px}
+.row > button.cols{display:grid;grid-template-columns:28px minmax(200px,1fr) 116px 56px 44px repeat(6,66px);align-items:center;gap:10px}
 .row > button:hover{background:#FAFBFC}
 .row > button:focus-visible{outline:2px solid var(--ink);outline-offset:-2px}
 .name{font-weight:500}
@@ -89,7 +90,9 @@ h2{font-size:14px;font-weight:600;color:var(--muted);margin:32px 0 10px;text-tra
   .row > button.cols{grid-template-columns:22px 1fr auto;row-gap:8px}
   .row .cols .c{text-align:left;font-size:13px}
   .row .cols .stats{grid-column:2/-1;display:grid;grid-template-columns:repeat(3,1fr);gap:6px 10px}
-  .row .cols .score{grid-column:2/-1;display:flex;gap:6px;align-items:baseline}
+  .row .cols .score{grid-column:2/3;display:flex;gap:6px;align-items:baseline}
+  .row .cols .n{grid-column:3/-1;display:flex;gap:6px;align-items:baseline;justify-content:flex-end}
+  .row .cols .n::before{display:inline}
   .row .cols .score::before{display:inline}
   .c[data-l]::before{content:attr(data-l);display:block;font:11px "IBM Plex Sans",sans-serif;color:var(--muted)}
   .row.open .detail{grid-template-columns:1fr;padding-left:16px;gap:12px}
@@ -117,6 +120,7 @@ h2{font-size:14px;font-weight:600;color:var(--muted);margin:32px 0 10px;text-tra
   </div>
 
   <h2>Signals</h2>
+  <p class="note">Win rates and average returns are <b>vs. the average day</b>: the signal's figure minus buying the S&amp;P on every day of the same periods (win rates in percentage points, returns in %). <span id="baseline"></span>. N is how many times the signal fired.</p>
   <div class="list" id="signals"></div>
 
   <h2>Recent alerts</h2>
@@ -259,14 +263,25 @@ function valueRows(k, v){
   }
 }
 const pctTone = s => s==null ? "" : String(s).startsWith("-") ? "down" : "up";
+// Win rates and average returns are shown relative to buying the S&P on every day of the
+// same periods (the baseline); the absolute figure and the baseline are in the tooltip.
+let BASE = {};
+const relTip = "Signal minus the all-days average for the same periods. Win rates in percentage points (pt), returns in %. Hover a value for the absolute figure.";
+function relCell(s, m, absKey, label){
+  const rel = s[m+"_rel"], abs = s[absKey];
+  if (rel==null || rel==="—") return `<span class="c" data-l="${label}">${abs??"—"}</span>`;
+  const tip = `${abs} after the signal vs ${BASE[m]??"–"} on all days`;
+  return `<span class="c ${pctTone(rel)}" data-l="${label} vs avg" title="${tip}">${rel}</span>`;
+}
 
 const open = new Set();
 function renderSignals(sigs){
   const rows = Object.entries(sigs).sort((a,b)=> a[1].rank-b[1].rank);
   $("signals").innerHTML = `<div class="thead cols">
       <span>#</span><span>Indicator</span><span>Status</span><span class="c">Score</span>
-      <span class="c">Win 1d</span><span class="c">Win 5d</span><span class="c">Win 30d</span>
-      <span class="c">Avg 1d</span><span class="c">Avg 5d</span><span class="c">Avg 30d</span></div>` +
+      <span class="c" title="Number of times the signal fired in the backtest (2012 to now)">N</span>
+      <span class="c" title="${relTip}">Win 1d</span><span class="c" title="${relTip}">Win 5d</span><span class="c" title="${relTip}">Win 30d</span>
+      <span class="c" title="${relTip}">Avg 1d</span><span class="c" title="${relTip}">Avg 5d</span><span class="c" title="${relTip}">Avg 30d</span></div>` +
   rows.map(([k,s])=>{
     let [cls,label] = STATUS[s.status] || STATUS.WATCHING;
     const plural = n => `${n} session${n>1?"s":""}`;
@@ -286,13 +301,14 @@ function renderSignals(sigs){
         <div><div class="name">${NAMES[k]||s.label}</div><div class="now">${nowLine(k, v)}</div></div>
         <span><span class="pill ${cls}"${tip?` title="${tip}"`:""}>${label}</span></span>
         <span class="c score" data-l="Score">${s.cv_score}</span>
+        <span class="c n" data-l="Samples" title="Fired ${s.n_signals??"–"} times in the backtest">${s.n_signals??"–"}</span>
         <div class="stats">
-          <span class="c" data-l="Win 1d">${s.win_rate_1d}</span>
-          <span class="c" data-l="Win 5d">${s.win_rate}</span>
-          <span class="c" data-l="Win 30d">${s.win_rate_30d}</span>
-          <span class="c ${pctTone(s.avg_ret_1d)}" data-l="Avg 1d">${s.avg_ret_1d}</span>
-          <span class="c ${pctTone(s.avg_ret_5d)}" data-l="Avg 5d">${s.avg_ret_5d}</span>
-          <span class="c ${pctTone(s.avg_ret_30d)}" data-l="Avg 30d">${s.avg_ret_30d}</span>
+          ${relCell(s,"win_rate_1d","win_rate_1d","Win 1d")}
+          ${relCell(s,"win_rate_5d","win_rate","Win 5d")}
+          ${relCell(s,"win_rate_30d","win_rate_30d","Win 30d")}
+          ${relCell(s,"avg_ret_1d","avg_ret_1d","Avg 1d")}
+          ${relCell(s,"avg_ret_5d","avg_ret_5d","Avg 5d")}
+          ${relCell(s,"avg_ret_30d","avg_ret_30d","Avg 30d")}
         </div>
       </button>
       <div class="detail">
@@ -328,6 +344,11 @@ function render(s){
   $("ratio").className = "v num " + (s.vix_ratio>=1?"down":"");
   $("skew").textContent = f(s.skew,1);
   $("market").textContent = (s.market_open?"Market open":"Market closed") + (s.last_updated?` · updated ${s.last_updated}${s.tz?" "+s.tz:""}`:"");
+  if (s.stats_info && s.stats_info.baseline){
+    BASE = s.stats_info.baseline;
+    const b = BASE, el = $("baseline");
+    if (el) el.textContent = `All days: win 1d ${b.win_rate_1d}, 5d ${b.win_rate_5d}, 30d ${b.win_rate_30d} · avg 1d ${b.avg_ret_1d}, 5d ${b.avg_ret_5d}, 30d ${b.avg_ret_30d}`;
+  }
   if (s.stats_info && s.stats_info.data_through){
     const d = x => new Date(x+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"});
     $("statsGen").textContent = d(s.stats_info.generated);
