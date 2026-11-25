@@ -5,9 +5,15 @@ on:
     - cron: "*/15 13-21 * * 1-5"   # every 15 min across US market hours (UTC, covers EST and EDT)
     - cron: "20 22 * * 1-5"        # after the close: also refresh breadth / ETF volume / vol-target
   workflow_dispatch:
+    inputs:
+      test_alert:
+        description: "Send a test VIX signal email"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
+  issues: write
 
 concurrency:
   group: update-dashboard
@@ -25,11 +31,13 @@ jobs:
           cache: pip
       - run: pip install -r requirements.txt
       - name: Build state.json
+        env:
+          TEST_FLAG: ${{ inputs.test_alert && '--test-alert' || '' }}
         run: |
           if [ "${{ github.event.schedule }}" = "20 22 * * 1-5" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ ! -f positioning.json ]; then
-            python build_state.py --positioning
+            python build_state.py --positioning $TEST_FLAG
           else
-            python build_state.py
+            python build_state.py $TEST_FLAG
           fi
       - name: Commit if changed
         run: |
@@ -40,3 +48,12 @@ jobs:
             git commit -q -m "Update data $(date -u +%Y-%m-%dT%H:%MZ)"
             git pull -q --rebase && git push -q
           fi
+      - name: Email when the VIX/VIX3M signal fires
+        # An issue assigned to the repo owner makes GitHub email them; no mail credentials needed.
+        if: hashFiles('notify.md') != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create --repo "${{ github.repository }}" \
+            --title "$(head -n1 notify.md)" --body "$(tail -n +3 notify.md)" \
+            --assignee "${{ github.repository_owner }}"
